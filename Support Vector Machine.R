@@ -20,3 +20,5 @@ print(paste("Mean Squared Error (MSE):", svm_mse))
 print(paste("Root Mean Squared Error (RMSE):", svm_rmse))
 print(paste("R-squared:", svm_r_squared))
 save(svm_model, file = "svm_model.RData")
+
+
