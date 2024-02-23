@@ -1,7 +1,3 @@
-# Install and load required packages
-install.packages("caret")
-library(caret)
-
 # Read the data
 data <- read.csv("Processed_Data.csv")
 
@@ -12,7 +8,7 @@ data$RCS_SIZE <- as.factor(data$RCS_SIZE)
 data <- subset(data, select = -c(COUNTRY_CODE))
 
 # Remove non-predictive columns
-data <- data[, -which(names(data) %in% c("OBJECT_TYPE", "RCS_SIZE", "LAUNCH_DATE"))]
+data <- data[, -which(names(data) %in% c("OBJECT_TYPE", "LAUNCH_DATE"))]
 
 # Split data into predictors and target variable
 X <- data[, -which(names(data) == "RCS_SIZE")]
@@ -31,16 +27,34 @@ svm_model <- svm(formula = RCS_SIZE ~ ., data = train_data, kernel = "radial")
 predictions <- predict(svm_model, test_data)
 
 # Calculate confusion matrix
-conf_matrix <- confusionMatrix(predictions, test_data$RCS_SIZE)
+conf_matrix <- table(predictions, test_data$RCS_SIZE)
 
-# Extract metrics
-accuracy <- conf_matrix$overall['Accuracy']
-precision <- conf_matrix$byClass['Precision']
-recall <- conf_matrix$byClass['Recall']
-f1_score <- conf_matrix$byClass['F1']
+# Calculate evaluation metrics
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+# Calculate precision, recall, and F1 score for each class
+precision <- recall <- f1_score <- numeric(length = nlevels(test_data$RCS_SIZE))
+
+for (i in 1:nlevels(test_data$RCS_SIZE)) {
+  class_label <- levels(test_data$RCS_SIZE)[i]
+  
+  # Calculate precision for class i
+  precision[i] <- ifelse(sum(conf_matrix[i, ]) == 0, 0, conf_matrix[i, i] / sum(conf_matrix[i, ]))
+  
+  # Calculate recall for class i
+  recall[i] <- ifelse(sum(conf_matrix[, i]) == 0, 0, conf_matrix[i, i] / sum(conf_matrix[, i]))
+  
+  # Calculate F1 score for class i
+  f1_score[i] <- ifelse((precision[i] + recall[i]) == 0, 0, 2 * precision[i] * recall[i] / (precision[i] + recall[i]))
+}
 
 # Display results
 cat("Accuracy:", accuracy, "\n")
-cat("Precision:", precision, "\n")
-cat("Recall:", recall, "\n")
-cat("F1 Score:", f1_score, "\n")
+
+# Display precision, recall, and F1 score for each class
+for (i in 1:nlevels(test_data$RCS_SIZE)) {
+  class_label <- levels(test_data$RCS_SIZE)[i]
+  cat("Precision (", class_label, "):", precision[i], "\n")
+  cat("Recall (", class_label, "):", recall[i], "\n")
+  cat("F1 Score (", class_label, "):", f1_score[i], "\n")
+}

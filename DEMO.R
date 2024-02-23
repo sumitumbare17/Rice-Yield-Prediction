@@ -1,77 +1,70 @@
 # Read the data
+data <- read.csv("X1.csv", header = TRUE)
+y_data <- read.csv("y1.csv")
 
-# Step 1: Data Preprocessing
-# Check for missing values
-sum(is.na(data_combined))
+# Remove columns where all values are zero
+data_filtered <- data[, colSums(data != 0) > 0]
 
-# Step 2: Feature Engineering
-# (No specific feature engineering applied in this example)
+# Combine data with target variable
+data_combined <- cbind(data_filtered, RICE_YIELD = y_data)
 
-# Step 3: Model Selection and Tuning
+# Step 1: Split the data into training and testing sets
+set.seed(123)  # for reproducibility
+train_index <- sample(nrow(data_combined), 0.7 * nrow(data_combined))
+train_data <- data_combined[train_index, ]
+test_data <- data_combined[-train_index, ]
+
+# Define a function for Min-Max Scaling
+min_max_scale <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+# Apply Min-Max Scaling to both training and testing data
+train_data_scaled <- as.data.frame(lapply(train_data[, -which(names(train_data) == "RICE_YIELD")], min_max_scale))
+train_data_scaled$RICE_YIELD <- train_data$RICE_YIELD
+
+test_data_scaled <- as.data.frame(lapply(test_data[, -which(names(test_data) == "RICE_YIELD")], min_max_scale))
+test_data_scaled$RICE_YIELD <- test_data$RICE_YIELD
+
+# Step 2: Train the models using the training set
 # Random Forest model
 library(randomForest)
-rf_model <- randomForest(RICE_YIELD ~ ., data = data_combined)
+set.seed(120)  # Setting seed 
+rf_model <- randomForest(x = train_data_scaled[, -which(names(train_data_scaled) == "RICE_YIELD")], 
+                         y = train_data_scaled$RICE_YIELD, 
+                         ntree = 500) 
 
-# Decision Tree model
-library(rpart)
-dt_model <- rpart(RICE_YIELD ~ ., data = data_combined)
+# Step 3: Evaluate the model using the testing set
+# Predicting the Test set results 
+rf_predictions_test <- predict(rf_model, newdata = test_data_scaled[, -which(names(test_data_scaled) == "RICE_YIELD")])
 
-# SVM model
-library(e1071)
-svm_model <- svm(RICE_YIELD ~ ., data = data_combined)
+# Calculate RMSE
+rf_rmse_test <- sqrt(mean((rf_predictions_test - test_data_scaled$RICE_YIELD)^2))
 
-# XGBoost model
-library(xgboost)
-xgb_model <- xgboost(data = as.matrix(data_combined[, -which(names(data_combined) == "RICE_YIELD")]), 
-                     label = data_combined$RICE_YIELD,
-                     nrounds = 100,
-                     objective = "reg:squarederror",
-                     eval_metric = "rmse")
+# Calculate R-squared
+# Calculate residual sum of squares (SS_res)
+SS_res <- sum((rf_predictions_test - test_data_scaled$RICE_YIELD)^2)
 
-# Step 4: Ensemble Methods
-# Combine models using ensemble techniques if necessary
+# Calculate total sum of squares (SS_tot)
+mean_y <- mean(test_data_scaled$RICE_YIELD)
+SS_tot <- sum((test_data_scaled$RICE_YIELD - mean_y)^2)
 
-# Step 5: Cross-validation
-# Evaluate models using cross-validation techniques
+# Calculate R-squared
+rf_r_squared_test <- 1 - (SS_res / SS_tot)
 
-# Step 6: Model Evaluation
-# Random Forest
-rf_predictions <- predict(rf_model, data_combined)
-rf_mae <- mean(abs(rf_predictions - data_combined$RICE_YIELD))
-rf_mse <- mean((rf_predictions - data_combined$RICE_YIELD)^2)
-rf_rmse <- sqrt(mean((rf_predictions - data_combined$RICE_YIELD)^2))
-rf_r_squared <- cor(rf_predictions, data_combined$RICE_YIELD)^2
-
-# Decision Tree
-dt_predictions <- predict(dt_model, data_combined)
-dt_mae <- mean(abs(dt_predictions - data_combined$RICE_YIELD))
-dt_mse <- mean((dt_predictions - data_combined$RICE_YIELD)^2)
-dt_rmse <- sqrt(mean((dt_predictions - data_combined$RICE_YIELD)^2))
-dt_r_squared <- cor(dt_predictions, data_combined$RICE_YIELD)^2
-
-# SVM
-svm_predictions <- predict(svm_model, data_combined)
-svm_mae <- mean(abs(svm_predictions - data_combined$RICE_YIELD))
-svm_mse <- mean((svm_predictions - data_combined$RICE_YIELD)^2)
-svm_rmse <- sqrt(mean((svm_predictions - data_combined$RICE_YIELD)^2))
-svm_r_squared <- cor(svm_predictions, data_combined$RICE_YIELD)^2
-
-# XGBoost
-xgb_predictions <- predict(xgb_model, as.matrix(data_combined[, -which(names(data_combined) == "RICE_YIELD")]))
-xgb_mae <- mean(abs(xgb_predictions - data_combined$RICE_YIELD))
-xgb_mse <- mean((xgb_predictions - data_combined$RICE_YIELD)^2)
-xgb_rmse <- sqrt(mean((xgb_predictions - data_combined$RICE_YIELD)^2))
-xgb_r_squared <- cor(xgb_predictions, data_combined$RICE_YIELD)^2
-
-# Displaying metrics
-results <- data.frame(
-  Model = c("Random Forest", "Decision Tree", "SVM", "XGBoost"),
-  MAE = c(rf_mae, dt_mae, svm_mae, xgb_mae),
-  MSE = c(rf_mse, dt_mse, svm_mse, xgb_mse),
-  RMSE = c(rf_rmse, dt_rmse, svm_rmse, xgb_rmse),
-  R_squared = c(rf_r_squared, dt_r_squared, svm_r_squared, xgb_r_squared)
+# Displaying metrics for testing set
+results_test <- data.frame(
+  Model = "Random Forest (Scaled)",
+  RMSE = rf_rmse_test,
+  R_squared = rf_r_squared_test
 )
+print(results_test)
 
-print(results)
-
-save(xgb_model, file = "xgb_model.RData")
+# Plotting RMSE
+library("ggplot2")
+ggplot(results_test, aes(x = Model, y = RMSE, fill = Model)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Comparison of RMSE among Models (Testing Set)",
+       x = "Model",
+       y = "RMSE") +
+  theme_minimal()

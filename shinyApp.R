@@ -82,19 +82,36 @@ ui <- fluidPage(
     )
   )
 )
-
 # Define server logic
 server <- function(input, output) {
+  # Load the saved XGBoost model
+  load("xgb_model.RData")
+  
+  # Function to make predictions
   # Function to make predictions
   predict_yield <- function(input_data) {
-    # Convert input data to data frame
-    new_data <- data.frame(t(input_data))
+    # Convert input data to data frame with correct column names
+    new_data <- data.frame(
+      ANNUAL = input_data["ANNUAL"],
+      avg_rain = input_data["avg_rain"],
+      Nitrogen = input_data["Nitrogen"],
+      POTASH = input_data["POTASH"],
+      PHOSPHATE = input_data["PHOSPHATE"],
+      INCEPTISOLS = input_data["INCEPTISOLS"],
+      LOAMY_ALFISOL = input_data["LOAMY_ALFISOL"],
+      ORTHIDS = input_data["ORTHIDS"],
+      PSAMMENTS = input_data["PSAMMENTS"],
+      SANDY_ALFISOL = input_data["SANDY_ALFISOL"],
+      UDOLLS_UDALFS = input_data["UDOLLS_UDALFS"],
+      UDUPTS_UDALFS = input_data["UDUPTS_UDALFS"],
+      USTALF_USTOLLS = input_data["USTALF_USTOLLS"],
+      VERTIC_SOILS = input_data["VERTIC_SOILS"],
+      VERTISOLS = input_data["VERTISOLS"],
+      RICE_PRODUCTION = input_data["RICE_PRODUCTION"]
+    )
     
-    # Make predictions here using your model
-    # For example, prediction <- predict(model, newdata = new_data)
-    
-    # Dummy prediction for demonstration purposes
-    prediction <- sum(input_data)
+    # Make predictions using the loaded XGBoost model
+    prediction <- predict(xgb_model, newdata = as.matrix(new_data))
     
     return(prediction)
   }
